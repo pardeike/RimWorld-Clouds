@@ -1,12 +1,11 @@
-﻿using HarmonyLib;
-using System.IO;
+﻿using System.IO;
 using UnityEngine;
 using Verse;
 
 namespace Clouds
 {
 	[StaticConstructorOnStartup]
-	public static class Assets
+	public static class CloudAssets
 	{
 		static readonly AssetBundle assets = LoadAssetBundle();
 		static readonly GameObject cloudSystem = assets.LoadAsset<GameObject>("CloudSystem");
@@ -14,7 +13,7 @@ namespace Clouds
 		static ParticleSystem particles;
 		static float baseSpeed;
 
-		static Assets()
+		static CloudAssets()
 		{
 			Object.DontDestroyOnLoad(cloudSystem);
 		}

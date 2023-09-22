@@ -21,8 +21,8 @@ namespace Clouds
 	{
 		public static void Postfix(Map __instance)
 		{
-			var clouds = Assets.CreateClouds();
-			Assets.Speed = 0.5f;
+			var clouds = CloudAssets.CreateClouds();
+			CloudAssets.Speed = 0.5f;
 
 			var alt = AltitudeLayer.MetaOverlays.AltitudeFor();
 			clouds.transform.position = new Vector3(__instance.Size.x / 2f, alt, __instance.Size.z / 2f);
@@ -41,7 +41,7 @@ namespace Clouds
 			if (Rand.Chance(0.001f))
 				nextAngle = (nextAngle + Rand.Range(-10, 10f) + 360) % 360;
 
-			var currentAngle = Assets.Angle;
+			var currentAngle = CloudAssets.Angle;
 
 			var delta = nextAngle - currentAngle;
 			var absDelta = Math.Abs(delta);
@@ -50,7 +50,7 @@ namespace Clouds
 			currentAngle += delta * 0.001f;
 			currentAngle = (currentAngle + 360) % 360;
 
-			Assets.Angle = currentAngle;
+			CloudAssets.Angle = currentAngle;
 		}
 	}
 
@@ -67,8 +67,8 @@ namespace Clouds
 		{
 			if (__instance != null && Current.Game != null)
 			{
-				Assets.Pause = __instance.Paused;
-				Assets.Speed = Assets.BaseSpeed * __instance.TickRateMultiplier;
+				CloudAssets.Pause = __instance.Paused;
+				CloudAssets.Speed = CloudAssets.BaseSpeed * __instance.TickRateMultiplier;
 			}
 		}
 	}
