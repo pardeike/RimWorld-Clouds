@@ -1,0 +1,7 @@
+ManifestFileVersion: 0
+CRC: 1895089910
+AssetBundleManifest:
+  AssetBundleInfos:
+    Info_0:
+      Name: clouds
+      Dependencies: {}

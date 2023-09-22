@@ -1,0 +1,32 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.3.32929.385
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Clouds", "Source\Clouds.csproj", "{1D157382-8C12-46A7-A5C2-C49AECD14063}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1D157382-8C12-46A7-A5C2-C49AECD14063}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1D157382-8C12-46A7-A5C2-C49AECD14063}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1D157382-8C12-46A7-A5C2-C49AECD14063}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1D157382-8C12-46A7-A5C2-C49AECD14063}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6BBBF119-0F1F-43F3-9492-1EA97C85E027}
+	EndGlobalSection
+	GlobalSection(MonoDevelopProperties) = preSolution
+		Policies = $0
+		$0.DotNetNamingPolicy = $1
+		$1.DirectoryNamespaceAssociation = None
+		$1.ResourceNamePolicy = FileFormatDefault
+		version = 1.0
+	EndGlobalSection
+EndGlobal
