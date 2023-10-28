@@ -1,4 +1,6 @@
-﻿using System.IO;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using Verse;
 
@@ -7,65 +9,15 @@ namespace Clouds
 	[StaticConstructorOnStartup]
 	public static class CloudAssets
 	{
-		static readonly AssetBundle assets = LoadAssetBundle();
-		static readonly GameObject cloudSystem = assets.LoadAsset<GameObject>("CloudSystem");
-		static GameObject clouds;
-		static ParticleSystem particles;
-		static float baseSpeed;
+		public static readonly AssetBundle assets;
+		public static readonly GameObject cloudSystem;
+		public static readonly Dictionary<Map, CloudSystem> clouds = new();
 
 		static CloudAssets()
 		{
-			Object.DontDestroyOnLoad(cloudSystem);
-		}
-
-		public static GameObject CreateClouds()
-		{
-			clouds = Object.Instantiate(cloudSystem);
-			particles = clouds.GetComponent<ParticleSystem>();
-			baseSpeed = particles.main.simulationSpeed;
-			return clouds;
-		}
-
-		public static bool IsLoaded => clouds != null && particles != null;
-		public static float BaseSpeed => baseSpeed;
-
-		public static bool Active
-		{
-			get => clouds.activeSelf;
-			set => clouds.SetActive(value);
-		}
-
-		public static bool Pause
-		{
-			get => particles.isPaused;
-			set
-			{
-				if (value)
-					particles.Pause();
-				else
-					particles.Play();
-			}
-		}
-
-		public static float Speed
-		{
-			get => particles.main.simulationSpeed;
-			set
-			{
-				var main = particles.main;
-				main.simulationSpeed = value;
-			}
-		}
-
-		public static float Angle
-		{
-			get => clouds.transform.rotation.eulerAngles.y;
-			set
-			{
-				var eulerAngles = clouds.transform.rotation.eulerAngles;
-				eulerAngles.y = value;
-				clouds.transform.rotation = Quaternion.Euler(eulerAngles);
-			}
+			assets = LoadAssetBundle();
+			cloudSystem = assets.LoadAsset<GameObject>("CloudSystem");
+			UnityEngine.Object.DontDestroyOnLoad(cloudSystem);
 		}
 
 		public static string GetModRootDirectory()
@@ -78,6 +30,33 @@ namespace Clouds
 		{
 			var path = Path.Combine(GetModRootDirectory(), "Resources", "clouds");
 			return AssetBundle.LoadFromFile(path);
+		}
+
+		public static CloudSystem CloudsFor(Map map, bool updateActication = false)
+		{
+			if (clouds.TryGetValue(map, out var cloudSystem) == false)
+			{
+				cloudSystem = new CloudSystem(map);
+				clouds[map] = cloudSystem;
+			}
+
+			if (updateActication)
+				foreach (var cloud in clouds.Values)
+					cloud.Active = cloud == cloudSystem;
+
+			return cloudSystem;
+		}
+
+		public static void ApplyToAll(Action<CloudSystem> action)
+		{
+			foreach (var cloud in clouds.Values)
+				action(cloud);
+		}
+
+		public static void RemoveCloudsFor(Map map)
+		{
+			CloudsFor(map)?.Cleanup();
+			_ = clouds.Remove(map);
 		}
 	}
 }
