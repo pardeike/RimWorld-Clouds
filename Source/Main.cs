@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Verse;
+using Verse.Profile;
 
 namespace Clouds
 {
@@ -18,15 +19,26 @@ namespace Clouds
 		}
 	}
 
+	// remove all cloudsystems when game is closed
+	//
+	[HarmonyPatch]
+	public static class MemoryUtility_Patch
+	{
+		public static IEnumerable<MethodBase> TargetMethods()
+		{
+			yield return SymbolExtensions.GetMethodInfo(() => MemoryUtility.UnloadUnusedUnityAssets());
+			yield return SymbolExtensions.GetMethodInfo(() => MemoryUtility.ClearAllMapsAndWorld());
+		}
+
+		public static void Postfix() => CloudAssets.Cleanup();
+	}
+
 	// remove cloudsystem when map is destroyed
 	//
-	[HarmonyPatch(typeof(MapDeiniter), "Deinit_NewTemp")]
+	[HarmonyPatch(typeof(MapDeiniter), nameof(MapDeiniter.Deinit_NewTemp))]
 	public static class MapDeiniter_Deinit_NewTemp_Patch
 	{
-		public static void Postfix(Map map)
-		{
-			CloudAssets.RemoveCloudsFor(map);
-		}
+		public static void Postfix(Map map) => CloudAssets.RemoveCloudsFor(map);
 	}
 
 	// change direction of all cloudsystems
@@ -87,21 +99,13 @@ namespace Clouds
 	{
 		static float lastMultiplier = -1f;
 
-		public static (float, FloatRange) LerpedValues(float currentMultiplier)
-		{
-			var emission = GenMath.LerpDoubleClamped(1, 0.5f, 8, 40, currentMultiplier);
-			var f = GenMath.LerpDoubleClamped(1, 0.5f, 1f, 2f, currentMultiplier);
-			var size = new FloatRange(f, 2 * f);
-			return (emission, size);
-		}
-
 		public static void Postfix(Map __instance)
 		{
 			var currentMultiplier = __instance.weatherManager.CurWeatherAccuracyMultiplier;
 			if (lastMultiplier != currentMultiplier)
 			{
 				lastMultiplier = currentMultiplier;
-				var values = LerpedValues(currentMultiplier);
+				var values = CloudSystem.LerpedValues(currentMultiplier);
 				var clouds = CloudAssets.CloudsFor(__instance);
 				clouds.Emission = values.Item1;
 				clouds.Size = values.Item2;
@@ -109,8 +113,6 @@ namespace Clouds
 		}
 	}
 
-	// create cloudsystems as soon as we need them
-	// update them when switching maps
 	// make cloudsystem more transparent when zoomed in
 	//
 	[HarmonyPatch(typeof(CameraDriver), nameof(CameraDriver.Update))]

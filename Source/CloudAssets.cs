@@ -28,8 +28,16 @@ namespace Clouds
 
 		public static AssetBundle LoadAssetBundle()
 		{
-			var path = Path.Combine(GetModRootDirectory(), "Resources", "clouds");
+
+			var path = Path.Combine(GetModRootDirectory(), "Resources", "Clouds" + Application.platform);
 			return AssetBundle.LoadFromFile(path);
+		}
+
+		public static void Cleanup()
+		{
+			foreach (var cloudSystem in clouds.Values)
+				cloudSystem.Destroy();
+			clouds.Clear();
 		}
 
 		public static CloudSystem CloudsFor(Map map, bool updateActication = false)
@@ -55,8 +63,9 @@ namespace Clouds
 
 		public static void RemoveCloudsFor(Map map)
 		{
-			CloudsFor(map)?.Cleanup();
-			_ = clouds.Remove(map);
+			var cloudSystem = CloudsFor(map);
+			cloudSystem.Destroy();
+			clouds.Remove(map);
 		}
 	}
 }

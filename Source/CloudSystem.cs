@@ -29,14 +29,27 @@ namespace Clouds
 			clouds.transform.localScale = localScale;
 
 			var currentMultiplier = map.weatherManager.CurWeatherAccuracyMultiplier;
-			var values = Map_MapPreTick_Patch.LerpedValues(currentMultiplier);
+			var values = LerpedValues(currentMultiplier);
 			Emission = values.Item1;
 			Size = values.Item2;
+
+			particles.Stop();
+			particles.time = 0;
+			particles.Play();
 		}
 
-		public void Cleanup()
+		public void Destroy()
 		{
+			Log.Warning("CloudSystem destroyed");
 			UnityEngine.Object.Destroy(clouds);
+		}
+
+		public static (float, FloatRange) LerpedValues(float currentMultiplier)
+		{
+			var emission = GenMath.LerpDoubleClamped(1, 0.5f, 8, 40, currentMultiplier);
+			var f = GenMath.LerpDoubleClamped(1, 0.5f, 1f, 2f, currentMultiplier);
+			var size = new FloatRange(f, 2 * f);
+			return (emission, size);
 		}
 
 		public bool IsAvailable => clouds != null && particles != null;
