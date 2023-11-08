@@ -11,12 +11,13 @@ namespace Clouds
 	{
 		public static readonly AssetBundle assets;
 		public static readonly GameObject cloudSystem;
-		public static readonly Dictionary<Map, CloudSystem> clouds = new();
+		public static readonly Dictionary<Map, CloudSystem> clouds;
 
 		static CloudAssets()
 		{
 			assets = LoadAssetBundle();
 			cloudSystem = assets.LoadAsset<GameObject>("CloudSystem");
+			clouds = new();
 			UnityEngine.Object.DontDestroyOnLoad(cloudSystem);
 		}
 

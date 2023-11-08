@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Manifest>
+  <identifier>net.pardeike.rimworld.mod.clouds</identifier>
+  <version>2.2.0.0</version>
+  <targetVersions>
+    <li>1.4.0</li>
+  </targetVersions>
+  <dependencies>
+  </dependencies>
+  <incompatibleWith>
+  </incompatibleWith>
+  <loadBefore>
+    <li>Core</li>
+  </loadBefore>
+  <loadAfter>
+    <li>Harmony</li>
+  </loadAfter>
+  <manifestUri>https://github.com/pardeike/Clouds/latest/About/Manifest.xml</manifestUri>
+  <downloadUri>https://github.com/pardeike/Clouds/releases/latest</downloadUri>
+</Manifest>

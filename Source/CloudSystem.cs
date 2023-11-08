@@ -9,6 +9,7 @@ namespace Clouds
 		readonly GameObject clouds;
 		readonly ParticleSystem particles;
 		readonly ParticleSystemRenderer renderer;
+		readonly Material material;
 		readonly float baseSpeed;
 		readonly float baseAlpha;
 		public float nextAngle = -90f;
@@ -24,7 +25,9 @@ namespace Clouds
 			particles = clouds.GetComponent<ParticleSystem>();
 			renderer = clouds.GetComponent<ParticleSystemRenderer>();
 			baseSpeed = particles.main.simulationSpeed;
-			baseAlpha = renderer.materials[0].color.a;
+			material = renderer.materials[0];
+			material.renderQueue = MatBases.FogOfWar.renderQueue + 100;
+			baseAlpha = material.color.a;
 			clouds.transform.position = position;
 			clouds.transform.localScale = localScale;
 
@@ -78,11 +81,11 @@ namespace Clouds
 
 		public float Alpha
 		{
-			get => renderer.materials[0].color.a;
+			get => material.color.a;
 			set
 			{
-				var color = renderer.materials[0].color;
-				renderer.materials[0].color = new(color.r, color.g, color.b, value);
+				var color = material.color;
+				material.color = new(color.r, color.g, color.b, value);
 			}
 		}
 
