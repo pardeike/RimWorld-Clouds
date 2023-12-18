@@ -76,18 +76,22 @@ namespace Clouds
 		{
 			yield return AccessTools.Method(typeof(TickManager), nameof(TickManager.TogglePaused));
 			yield return AccessTools.PropertySetter(typeof(TickManager), nameof(TickManager.CurTimeSpeed));
+			yield return AccessTools.Method(typeof(WindowStack), nameof(WindowStack.Add));
+			yield return AccessTools.Method(typeof(WindowStack), nameof(WindowStack.AddNewImmediateWindow));
+			yield return AccessTools.Method(typeof(WindowStack), nameof(WindowStack.TryRemove), [ typeof(Window), typeof(bool) ]);
 		}
 
-		public static void Postfix(TickManager __instance)
+		public static void Postfix()
 		{
-			if (__instance == null || Current.Game == null)
+			var tickManager = Current.Game?.tickManager;
+			if (tickManager == null || Current.Game == null)
 				return;
 
 			CloudAssets.ApplyToAll(clouds =>
 			{
-				clouds.Pause = __instance.Paused;
+				clouds.Pause = tickManager.Paused;
 				var curWindSpeedFactor = Find.CurrentMap.weatherManager.CurWindSpeedFactor;
-				clouds.Speed = clouds.BaseSpeed * curWindSpeedFactor * (int)__instance.curTimeSpeed;
+				clouds.Speed = clouds.BaseSpeed * curWindSpeedFactor * (int)tickManager.curTimeSpeed;
 			});
 		}
 	}
