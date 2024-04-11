@@ -35,9 +35,20 @@ namespace Clouds
 
 	// remove cloudsystem when map is destroyed
 	//
-	[HarmonyPatch(typeof(MapDeiniter), nameof(MapDeiniter.Deinit_NewTemp))]
-	public static class MapDeiniter_Deinit_NewTemp_Patch
+	[HarmonyPatch]
+	public static class MapDeiniter_Deinit_Patch
 	{
+		public static IEnumerable<MethodBase> TargetMethods()
+		{
+			MethodInfo method;
+			method = AccessTools.Method(typeof(MapDeiniter), "Deinit_NewTemp");
+			if (method != null)
+				yield return method;
+			method = AccessTools.Method(typeof(MapDeiniter), nameof(MapDeiniter.Deinit));
+			if (method != null)
+				yield return method;
+		}
+
 		public static void Postfix(Map map) => CloudAssets.RemoveCloudsFor(map);
 	}
 
@@ -78,7 +89,7 @@ namespace Clouds
 			yield return AccessTools.PropertySetter(typeof(TickManager), nameof(TickManager.CurTimeSpeed));
 			yield return AccessTools.Method(typeof(WindowStack), nameof(WindowStack.Add));
 			yield return AccessTools.Method(typeof(WindowStack), nameof(WindowStack.AddNewImmediateWindow));
-			yield return AccessTools.Method(typeof(WindowStack), nameof(WindowStack.TryRemove), [ typeof(Window), typeof(bool) ]);
+			yield return AccessTools.Method(typeof(WindowStack), nameof(WindowStack.TryRemove), [typeof(Window), typeof(bool)]);
 		}
 
 		public static void Postfix()

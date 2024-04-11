@@ -51,7 +51,7 @@ namespace Clouds
 		{
 			var emission = GenMath.LerpDoubleClamped(1, 0.5f, 8, 40, currentMultiplier);
 			var f = GenMath.LerpDoubleClamped(1, 0.5f, 1f, 2f, currentMultiplier);
-			var size = new FloatRange(f, 2 * f);
+			var size = new FloatRange(f, 4 * f);
 			return (emission, size);
 		}
 

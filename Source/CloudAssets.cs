@@ -17,7 +17,7 @@ namespace Clouds
 		{
 			assets = LoadAssetBundle();
 			cloudSystem = assets.LoadAsset<GameObject>("CloudSystem");
-			clouds = new();
+			clouds = [];
 			UnityEngine.Object.DontDestroyOnLoad(cloudSystem);
 		}
 
