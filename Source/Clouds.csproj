@@ -6,7 +6,7 @@
 		<TargetFramework>net472</TargetFramework>
 		<LangVersion>latest</LangVersion>
 		<PlatformTarget>x64</PlatformTarget>
-		<OutputPath>..\Assemblies\</OutputPath>
+		<OutputPath>..\1.6\Assemblies\</OutputPath>
 		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 		<Version>$(ModVersion)</Version>
@@ -45,8 +45,8 @@
 
 	<ItemGroup>
 		<PackageReference Include="Brrainz.RimWorld.CrossPromotion" Version="1.1.2" />
-		<PackageReference Include="Krafs.Rimworld.Ref" Version="1.5.4066" GeneratePathProperty="true" />
-		<PackageReference Include="Lib.Harmony" Version="2.3.3" ExcludeAssets="runtime" />
+		<PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4507-beta" GeneratePathProperty="true" />
+		<PackageReference Include="Lib.Harmony" Version="2.3.6" ExcludeAssets="runtime" />
 		<PackageReference Include="Microsoft.NETCore.Platforms" Version="7.0.4" />
 		<PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3">
 			<PrivateAssets>all</PrivateAssets>
@@ -89,14 +89,17 @@
 	<Target Name="CopyToRimworld" AfterTargets="PostBuildAction" Condition="'$(RIMWORLD_MOD_DIR)' != ''">
 		<RemoveDir Directories="$(RIMWORLD_MOD_DIR)\$(ModFileName)" />
 		<ItemGroup>
+			<Copy_15 Include="..\1.5\**" />
+			<Copy_16 Include="..\1.6\**" />
 			<CopyAbout Include="..\About\**" />
 			<CopyAssemblies Include="..\Assemblies\**" />
 			<CopyResources Include="..\Resources\**" />
 			<CopyLicense Include="..\LICENSE" />
 			<CopyReadme Include="..\Readme.md" />
 		</ItemGroup>
+		<Copy SourceFiles="@(Copy_15)" DestinationFolder="$(RIMWORLD_MOD_DIR)\$(ModFileName)\1.5\%(RecursiveDir)" />
+		<Copy SourceFiles="@(Copy_16)" DestinationFolder="$(RIMWORLD_MOD_DIR)\$(ModFileName)\1.6\%(RecursiveDir)" />
 		<Copy SourceFiles="@(CopyAbout)" DestinationFolder="$(RIMWORLD_MOD_DIR)\$(ModFileName)\About\%(RecursiveDir)" />
-		<Copy SourceFiles="@(CopyAssemblies)" DestinationFolder="$(RIMWORLD_MOD_DIR)\$(ModFileName)\Assemblies\%(RecursiveDir)" />
 		<Copy SourceFiles="@(CopyResources)" DestinationFolder="$(RIMWORLD_MOD_DIR)\$(ModFileName)\Resources\%(RecursiveDir)" />
 		<Copy SourceFiles="@(CopyLicense)" DestinationFolder="$(RIMWORLD_MOD_DIR)\$(ModFileName)" />
 		<Copy SourceFiles="@(CopyReadme)" DestinationFolder="$(RIMWORLD_MOD_DIR)\$(ModFileName)" />
