@@ -4,6 +4,7 @@
   <author>Andreas Pardeike</author>
   <supportedVersions>
     <li>1.5</li>
+    <li>1.6</li>
   </supportedVersions>
   <modDependencies>
     <li>
@@ -14,7 +15,7 @@
     </li>
   </modDependencies>
   <packageId>brrainz.clouds</packageId>
-  <modVersion>2.2.3.0</modVersion>
+  <modVersion>2.3.0.0</modVersion>
   <steamAppId>3039192325</steamAppId>
   <description>Particle clouds. Simply beautiful.
 
