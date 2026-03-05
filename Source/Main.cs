@@ -136,15 +136,30 @@ namespace Clouds
 		public static void Postfix(CameraDriver __instance)
 		{
 			var currentMap = Find.CurrentMap;
-			if (currentMap == null)
-			{
-				// Deactivate all clouds when on world map
-				CloudAssets.ApplyToAll(clouds => clouds.Active = false);
+			if (DeactivateClouds(currentMap))
 				return;
-			}
 
 			var clouds = CloudAssets.CloudsFor(currentMap, true);
 			clouds.Alpha = GenMath.LerpDoubleClamped(20, 30, 0f, clouds.BaseAlpha, __instance.rootPos.y);
+		}
+		
+		private static bool DeactivateClouds(Map currentMap)
+		{
+			var isWorldMap = currentMap == null;
+			if (isWorldMap)
+			{
+				CloudAssets.ApplyToAll(clouds => clouds.Active = false);
+				return true;
+			}
+
+			var isVacuumBiome = currentMap.Biome?.inVacuum == true;
+			if (isVacuumBiome)
+			{
+				CloudAssets.ApplyToAll(clouds => clouds.Active = false);
+				return true;
+			}
+
+			return false;
 		}
 	}
 }
