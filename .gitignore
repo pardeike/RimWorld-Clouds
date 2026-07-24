@@ -52,6 +52,7 @@ artifacts/
 !Originals/Clouds/Assets/CloudSystem.prefab.meta
 !Originals/Clouds/Assets/CloudSheet.mat.meta
 !Originals/Clouds/Assets/cloud-sheet.png.meta
+!Originals/Clouds/Assets/cloud-cluster.png.meta
 !Originals/Clouds/Assets/CloudParticle.shader.meta
 *.obj
 *.pch

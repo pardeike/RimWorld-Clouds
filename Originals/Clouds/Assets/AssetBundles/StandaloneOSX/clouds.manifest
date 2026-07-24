@@ -1,12 +1,15 @@
 ManifestFileVersion: 0
-CRC: 3924639254
+CRC: 3372635134
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: ad47a8eb4cd0298d4317d6cc31368fb7
+    Hash: bfb7e106a742d9082e18de4190c59f14
   TypeTreeHash:
     serializedVersion: 2
-    Hash: fdc23b89627a2639aa1a33789da149ab
+    Hash: e07c6e0615e63ae3c7d9413510c73dcd
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: bfb7e106a742d9082e18de4190c59f14
 HashAppended: 0
 ClassTypes:
 - Class: 1
@@ -25,11 +28,7 @@ ClassTypes:
   Script: {instanceID: 0}
 - Class: 199
   Script: {instanceID: 0}
-- Class: 213
-  Script: {instanceID: 0}
 SerializeReferenceClassIdentifiers: []
 Assets:
-- Assets/CloudSheet.mat
-- Assets/cloud-sheet.png
 - Assets/CloudSystem.prefab
 Dependencies: []

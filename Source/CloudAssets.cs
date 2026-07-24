@@ -56,6 +56,17 @@ namespace Clouds
 			return cloudSystem;
 		}
 
+		public static bool TryGetCloudsFor(Map map, out CloudSystem cloudSystem)
+		{
+			if (map == null)
+			{
+				cloudSystem = null;
+				return false;
+			}
+
+			return clouds.TryGetValue(map, out cloudSystem);
+		}
+
 		public static void ApplyToAll(Action<CloudSystem> action)
 		{
 			foreach (var cloud in clouds.Values)
@@ -64,9 +75,11 @@ namespace Clouds
 
 		public static void RemoveCloudsFor(Map map)
 		{
-			var cloudSystem = CloudsFor(map);
-			cloudSystem.Destroy();
-			clouds.Remove(map);
+			if (clouds.TryGetValue(map, out var cloudSystem))
+			{
+				cloudSystem.Destroy();
+				clouds.Remove(map);
+			}
 		}
 	}
 }

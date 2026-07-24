@@ -5,6 +5,8 @@ VisualStudioVersion = 17.3.32929.385
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Clouds", "Source\Clouds.csproj", "{1D157382-8C12-46A7-A5C2-C49AECD14063}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Clouds.BridgeTools", "Source\BridgeTools\Clouds.BridgeTools.csproj", "{C601FB7E-2A21-4D77-B130-B082A2C3B87F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{1D157382-8C12-46A7-A5C2-C49AECD14063}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1D157382-8C12-46A7-A5C2-C49AECD14063}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1D157382-8C12-46A7-A5C2-C49AECD14063}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C601FB7E-2A21-4D77-B130-B082A2C3B87F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C601FB7E-2A21-4D77-B130-B082A2C3B87F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C601FB7E-2A21-4D77-B130-B082A2C3B87F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C601FB7E-2A21-4D77-B130-B082A2C3B87F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

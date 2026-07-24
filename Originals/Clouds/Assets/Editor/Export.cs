@@ -5,13 +5,52 @@ using UnityEngine;
 public class CreateAssetBundles
 {
 	[MenuItem("Assets/Build Standalone AssetBundles")]
-	static void BuildStandaloneAssetBundles()
+	public static void BuildStandaloneAssetBundles()
 	{
+		GenerateCloudClusterTexture.GenerateAndValidate();
+		ValidateCloudEntryGeometry();
+		AssetDatabase.SaveAssets();
+
 		var path = "Assets/AssetBundles";
 		PreBuildDirectoryCheck(path);
 		Build(path, RuntimePlatform.WindowsPlayer, BuildTarget.StandaloneWindows64);
 		Build(path, RuntimePlatform.LinuxPlayer, BuildTarget.StandaloneLinux64);
 		Build(path, RuntimePlatform.OSXPlayer, BuildTarget.StandaloneOSX);
+	}
+
+	static void ValidateCloudEntryGeometry()
+	{
+		const float normalizedMapHalfExtent = 12.5f;
+		const float runtimeMaximumBaseSize = 4f;
+		const float maximumWeatherSizeFactor = 1.45f;
+		const float requiredEntryPadding = 2f;
+
+		var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/CloudSystem.prefab");
+		if (prefab == null)
+			throw new IOException("CloudSystem.prefab could not be loaded for entry-geometry validation.");
+
+		var particles = prefab.GetComponent<ParticleSystem>();
+		if (particles == null)
+			throw new IOException("CloudSystem.prefab has no ParticleSystem.");
+
+		var maximumParticleRadius =
+			runtimeMaximumBaseSize * maximumWeatherSizeFactor * 0.5f;
+		var upstreamSpawnDistance = -particles.shape.position.y;
+		var requiredSpawnDistance =
+			normalizedMapHalfExtent + maximumParticleRadius + requiredEntryPadding;
+		if (upstreamSpawnDistance < requiredSpawnDistance)
+		{
+			throw new IOException(
+				$"Cloud emitter is too close to the map: {upstreamSpawnDistance:0.###} "
+				+ $"but at least {requiredSpawnDistance:0.###} is required.");
+		}
+
+		Debug.Log(
+			$"Cloud entry geometry validated: emitter {upstreamSpawnDistance:0.###}, "
+			+ $"largest radius {maximumParticleRadius:0.###}, "
+			+ $"fully outside map by "
+			+ $"{upstreamSpawnDistance - normalizedMapHalfExtent - maximumParticleRadius:0.###} "
+			+ "normalized units.");
 	}
 
 	static void Build(string basePath, RuntimePlatform platform, BuildTarget target)
@@ -26,7 +65,13 @@ public class CreateAssetBundles
 				assetNames = new[] { "Assets/CloudSystem.prefab" }
 			}
 		};
-		BuildPipeline.BuildAssetBundles(path, bundles, BuildAssetBundleOptions.None, target);
+		var manifest = BuildPipeline.BuildAssetBundles(
+			path,
+			bundles,
+			BuildAssetBundleOptions.ForceRebuildAssetBundle,
+			target);
+		if (manifest == null)
+			throw new IOException($"Unity failed to build the Clouds asset bundle for {target}.");
 
 		var from = path + "/clouds";
 		var resources = Path.GetFullPath(Path.Combine(Application.dataPath, "../../../Resources"));

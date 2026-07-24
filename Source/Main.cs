@@ -100,9 +100,7 @@ namespace Clouds
 
 			CloudAssets.ApplyToAll(clouds =>
 			{
-				clouds.Pause = tickManager.Paused;
-				var curWindSpeedFactor = Find.CurrentMap.weatherManager.CurWindSpeedFactor;
-				clouds.Speed = clouds.BaseSpeed * curWindSpeedFactor * (int)tickManager.curTimeSpeed;
+				clouds.SynchronizeTime(tickManager);
 			});
 		}
 	}
@@ -112,22 +110,16 @@ namespace Clouds
 	[HarmonyPatch(typeof(Map), nameof(Map.MapPreTick))]
 	public static class Map_MapPreTick_Patch
 	{
-		static float lastMultiplier = -1f;
-
 		public static void Postfix(Map __instance)
 		{
 			if (CloudVisibility.IsAllowedOn(__instance) == false)
 				return;
 
-			var currentMultiplier = __instance.weatherManager.CurWeatherAccuracyMultiplier;
-			if (lastMultiplier != currentMultiplier)
-			{
-				lastMultiplier = currentMultiplier;
-				var values = CloudSystem.LerpedValues(currentMultiplier);
-				var clouds = CloudAssets.CloudsFor(__instance);
-				clouds.Emission = values.Item1;
-				clouds.Size = values.Item2;
-			}
+			var clouds = CloudAssets.CloudsFor(__instance);
+			clouds.UpdateWeather(
+				__instance.weatherManager,
+				Current.Game?.tickManager,
+				true);
 		}
 	}
 
