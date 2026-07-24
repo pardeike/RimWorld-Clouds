@@ -116,6 +116,9 @@ namespace Clouds
 
 		public static void Postfix(Map __instance)
 		{
+			if (CloudVisibility.IsAllowedOn(__instance) == false)
+				return;
+
 			var currentMultiplier = __instance.weatherManager.CurWeatherAccuracyMultiplier;
 			if (lastMultiplier != currentMultiplier)
 			{
@@ -145,21 +148,28 @@ namespace Clouds
 		
 		private static bool DeactivateClouds(Map currentMap)
 		{
-			var isWorldMap = currentMap == null;
-			if (isWorldMap)
-			{
-				CloudAssets.ApplyToAll(clouds => clouds.Active = false);
-				return true;
-			}
-
-			var isVacuumBiome = currentMap.Biome?.inVacuum == true;
-			if (isVacuumBiome)
+			if (CloudVisibility.IsAllowedOn(currentMap) == false)
 			{
 				CloudAssets.ApplyToAll(clouds => clouds.Active = false);
 				return true;
 			}
 
 			return false;
+		}
+	}
+
+	public static class CloudVisibility
+	{
+		public static bool IsAllowedOn(Map map)
+		{
+			if (map == null)
+				return false;
+
+			var biome = map.Biome;
+			if (biome?.inVacuum == true || biome?.disableSkyLighting == true)
+				return false;
+
+			return map.generatorDef?.isUnderground != true;
 		}
 	}
 }

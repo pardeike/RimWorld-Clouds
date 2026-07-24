@@ -18,10 +18,21 @@ public class CreateAssetBundles
 	{
 		var path = basePath + "/" + target;
 		PreBuildDirectoryCheck(path);
-		BuildPipeline.BuildAssetBundles(path, BuildAssetBundleOptions.None, target);
-		var fron = path + "/clouds";
-		var to = "../../Resources/Clouds" + platform.ToString();
-		File.Copy(fron, to, true);
+		var bundles = new[]
+		{
+			new AssetBundleBuild
+			{
+				assetBundleName = "clouds",
+				assetNames = new[] { "Assets/CloudSystem.prefab" }
+			}
+		};
+		BuildPipeline.BuildAssetBundles(path, bundles, BuildAssetBundleOptions.None, target);
+
+		var from = path + "/clouds";
+		var resources = Path.GetFullPath(Path.Combine(Application.dataPath, "../../../Resources"));
+		PreBuildDirectoryCheck(resources);
+		var to = Path.Combine(resources, "Clouds" + platform);
+		File.Copy(from, to, true);
 	}
 
 	static void PreBuildDirectoryCheck(string directory)
