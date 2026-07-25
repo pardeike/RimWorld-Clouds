@@ -115,7 +115,7 @@
 			<CopyAssemblies Include="..\Assemblies\**" />
 			<CopyResources Include="..\Resources\**" />
 			<CopyLicense Include="..\LICENSE" />
-			<CopyReadme Include="..\Readme.md" />
+			<CopyReadme Include="..\README.md" />
 			<CopyBridgeTools Include="..\artifacts\BridgeTools\Clouds\Clouds.BridgeTools.dll" Condition="'$(BuildBridgeTools)' != 'false'" />
 		</ItemGroup>
 		<Copy SourceFiles="@(Copy_15)" DestinationFolder="$(RIMWORLD_MOD_DIR)\$(ModFileName)\1.5\%(RecursiveDir)" />
