@@ -1,5 +1,6 @@
 using RimBridgeServer.Sdk;
 using RimWorld;
+using RimWorld.Planet;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -38,6 +39,15 @@ namespace Clouds.BridgeTools
 			public float Alpha;
 		}
 
+		sealed class VisibilityContractCase
+		{
+			public string Name;
+			public CloudVisibilityInputs Inputs;
+			public bool ExpectedAllowed;
+			public CloudVisibilityReason ExpectedReason;
+			public CloudVisibilitySource ExpectedSource;
+		}
+
 		[Tool(
 			"clouds/get_weather_state",
 			Description = "Read the current map, RimWorld weather transition, and effective Clouds GPU profile without changing game state.",
@@ -50,6 +60,66 @@ namespace Clouds.BridgeTools
 				return new { success = false, error = "RimBridge SDK context was not injected." };
 
 			return await ctx.MainThread.InvokeAsync(CaptureState, cancellationToken);
+		}
+
+		[Tool(
+			"clouds/get_visibility_state",
+			Description = "Read the current world/map render mode, cached map-level cloud decision, generic detection signals, and active cloud renderers without changing game state.",
+			ResultDescription = "Returns a visibility decision even in world view, including its reason, source, cache state, defining map metadata, roof-scan work, and active renderer counts.")]
+		public static async Task<object> GetVisibilityState(
+			IRimBridgeContext ctx,
+			CancellationToken cancellationToken)
+		{
+			if (ctx == null)
+				return new { success = false, error = "RimBridge SDK context was not injected." };
+
+			return await ctx.MainThread.InvokeAsync(CaptureVisibilityState, cancellationToken);
+		}
+
+		[Tool(
+			"clouds/validate_visibility_rules",
+			Description = "Run deterministic table-driven contracts for Clouds' map-level visibility precedence without changing game state.",
+			ResultDescription = "Returns a RimBridge evidence manifest covering explicit Def overrides, DLC/generic signals, bounded pocket-map handling, and the full-roof fallback.")]
+		public static Task<object> ValidateVisibilityRules(CancellationToken cancellationToken)
+		{
+			var manifest = RimBridgeEvidence.CreateManifest("clouds/visibility_rules");
+			manifest.modVersion = typeof(Clouds_Main).Assembly.GetName().Version?.ToString() ?? string.Empty;
+			manifest.gameVersion = VersionControl.CurrentVersionStringWithRev;
+			manifest.environment.modVersion = manifest.modVersion;
+			manifest.environment.gameVersion = manifest.gameVersion;
+
+			var cases = VisibilityContractCases();
+			foreach (var contract in cases)
+			{
+				cancellationToken.ThrowIfCancellationRequested();
+				var actual = CloudVisibility.Decide(contract.Inputs);
+				var passed = actual.Allowed == contract.ExpectedAllowed
+					&& actual.Reason == contract.ExpectedReason
+					&& actual.Source == contract.ExpectedSource;
+				manifest.assertions.Add(RimBridgeEvidence.IsTrue(
+					contract.Name,
+					passed,
+					details: new
+					{
+						inputs = DescribeVisibilityInputs(contract.Inputs),
+						expected = new
+						{
+							allowed = contract.ExpectedAllowed,
+							reason = contract.ExpectedReason.ToString(),
+							source = contract.ExpectedSource.ToString()
+						},
+						actual = DescribeVisibilityDecision(actual)
+					}));
+			}
+
+			manifest.environment.details = new
+			{
+				caseCount = cases.Length,
+				mapDecisionScope = "cached once per Map",
+				perCellVisibility = "RimWorld stencil mask on the GPU"
+			};
+			RimBridgeEvidence.Complete(manifest);
+			return Task.FromResult<object>(manifest);
 		}
 
 		[Tool(
@@ -389,6 +459,233 @@ namespace Clouds.BridgeTools
 					rootSize = Find.CameraDriver.RootSize,
 					zoom = Find.CameraDriver.CurrentZoom.ToString()
 				}
+			};
+		}
+
+		static object CaptureVisibilityState()
+		{
+			var map = Find.CurrentMap;
+			var evaluation = CloudVisibility.Inspect(map, out var cacheHit);
+			var worldRenderMode = CloudViewState.CurrentMode;
+			var activeClouds = CloudAssets.clouds.Values
+				.Where(cloud => cloud.Active)
+				.ToArray();
+
+			return new
+			{
+				success = true,
+				modVersion = typeof(Clouds_Main).Assembly.GetName().Version?.ToString(),
+				gameVersion = VersionControl.CurrentVersionStringWithRev,
+				view = new
+				{
+					worldRenderMode = worldRenderMode.ToString(),
+					worldViewBlocked = worldRenderMode == WorldRenderMode.Planet,
+					currentMapRetained = map != null,
+					cloudsAllowedInCurrentView = worldRenderMode != WorldRenderMode.Planet
+						&& evaluation.Decision.Allowed
+				},
+				map = map == null ? null : DescribeVisibilityMap(map, evaluation, cacheHit),
+				clouds = new
+				{
+					loadedCount = CloudAssets.clouds.Count,
+					activeCount = activeClouds.Length,
+					trackedActiveMapId = CloudAssets.ActiveCloudSystem?.Map?.uniqueID,
+					activeMapIds = activeClouds.Select(cloud => cloud.Map.uniqueID).ToArray(),
+					cachedMapCount = CloudVisibility.CachedMapCount
+				}
+			};
+		}
+
+		static object DescribeVisibilityMap(
+			Map map,
+			CloudVisibilityEvaluation evaluation,
+			bool cacheHit)
+		{
+			var inputs = evaluation.Inputs;
+			return new
+			{
+				id = map.uniqueID,
+				name = map.info?.parent?.LabelCap.ToString(),
+				size = new { x = map.Size.x, z = map.Size.z },
+				eligible = evaluation.Decision.Allowed,
+				reason = evaluation.Decision.Reason.ToString(),
+				source = evaluation.Decision.Source.ToString(),
+				cacheHit,
+				generatorDef = evaluation.Generator?.defName,
+				biomeDef = evaluation.Biome?.defName,
+				planetLayerDef = evaluation.PlanetLayer?.defName,
+				extensions = new
+				{
+					generator = inputs.GeneratorMode.ToString(),
+					biome = inputs.BiomeMode.ToString(),
+					planetLayer = inputs.PlanetLayerMode.ToString()
+				},
+				signals = DescribeVisibilityInputs(inputs),
+				roofGridScanned = evaluation.RoofGridScanned,
+				roofCellsChecked = evaluation.RoofCellsChecked,
+				cloudSystemLoaded = CloudAssets.TryGetCloudsFor(map, out _)
+			};
+		}
+
+		static object DescribeVisibilityDecision(CloudVisibilityDecision decision)
+		{
+			return new
+			{
+				allowed = decision.Allowed,
+				reason = decision.Reason.ToString(),
+				source = decision.Source.ToString()
+			};
+		}
+
+		static object DescribeVisibilityInputs(CloudVisibilityInputs inputs)
+		{
+			return new
+			{
+				hasMap = inputs.HasMap,
+				generatorMode = inputs.GeneratorMode.ToString(),
+				biomeMode = inputs.BiomeMode.ToString(),
+				planetLayerMode = inputs.PlanetLayerMode.ToString(),
+				inVacuum = inputs.InVacuum,
+				disableSkyLighting = inputs.DisableSkyLighting,
+				isSpaceLayer = inputs.IsSpaceLayer,
+				isUndergroundGenerator = inputs.IsUndergroundGenerator,
+				isPocketMap = inputs.IsPocketMap,
+				disableSunShadows = inputs.DisableSunShadows,
+				fullyRoofed = inputs.FullyRoofed
+			};
+		}
+
+		static VisibilityContractCase[] VisibilityContractCases()
+		{
+			return new[]
+			{
+				VisibilityCase(
+					"no map is blocked",
+					new CloudVisibilityInputs(hasMap: false),
+					false,
+					CloudVisibilityReason.NoMap),
+				VisibilityCase(
+					"ordinary outdoor map is allowed",
+					new CloudVisibilityInputs(hasMap: true),
+					true,
+					CloudVisibilityReason.Allowed),
+				VisibilityCase(
+					"generator Block overrides automatic detection",
+					new CloudVisibilityInputs(generatorMode: CloudVisibilityMode.Block),
+					false,
+					CloudVisibilityReason.ExplicitBlock,
+					CloudVisibilitySource.MapGeneratorExtension),
+				VisibilityCase(
+					"generator Allow overrides vacuum",
+					new CloudVisibilityInputs(
+						generatorMode: CloudVisibilityMode.Allow,
+						inVacuum: true),
+					true,
+					CloudVisibilityReason.ExplicitAllow,
+					CloudVisibilitySource.MapGeneratorExtension),
+				VisibilityCase(
+					"biome Block is honored",
+					new CloudVisibilityInputs(biomeMode: CloudVisibilityMode.Block),
+					false,
+					CloudVisibilityReason.ExplicitBlock,
+					CloudVisibilitySource.BiomeExtension),
+				VisibilityCase(
+					"biome Allow overrides space layer",
+					new CloudVisibilityInputs(
+						biomeMode: CloudVisibilityMode.Allow,
+						isSpaceLayer: true),
+					true,
+					CloudVisibilityReason.ExplicitAllow,
+					CloudVisibilitySource.BiomeExtension),
+				VisibilityCase(
+					"planet layer Block is honored",
+					new CloudVisibilityInputs(planetLayerMode: CloudVisibilityMode.Block),
+					false,
+					CloudVisibilityReason.ExplicitBlock,
+					CloudVisibilitySource.PlanetLayerExtension),
+				VisibilityCase(
+					"planet layer Allow overrides underground generator",
+					new CloudVisibilityInputs(
+						planetLayerMode: CloudVisibilityMode.Allow,
+						isUndergroundGenerator: true),
+					true,
+					CloudVisibilityReason.ExplicitAllow,
+					CloudVisibilitySource.PlanetLayerExtension),
+				VisibilityCase(
+					"generator extension outranks biome extension",
+					new CloudVisibilityInputs(
+						generatorMode: CloudVisibilityMode.Block,
+						biomeMode: CloudVisibilityMode.Allow),
+					false,
+					CloudVisibilityReason.ExplicitBlock,
+					CloudVisibilitySource.MapGeneratorExtension),
+				VisibilityCase(
+					"biome extension outranks planet layer extension",
+					new CloudVisibilityInputs(
+						biomeMode: CloudVisibilityMode.Allow,
+						planetLayerMode: CloudVisibilityMode.Block),
+					true,
+					CloudVisibilityReason.ExplicitAllow,
+					CloudVisibilitySource.BiomeExtension),
+				VisibilityCase(
+					"vacuum biome is blocked",
+					new CloudVisibilityInputs(inVacuum: true),
+					false,
+					CloudVisibilityReason.VacuumBiome),
+				VisibilityCase(
+					"disabled sky lighting is blocked",
+					new CloudVisibilityInputs(disableSkyLighting: true),
+					false,
+					CloudVisibilityReason.SkyLightingDisabled),
+				VisibilityCase(
+					"space planet layer is blocked",
+					new CloudVisibilityInputs(isSpaceLayer: true),
+					false,
+					CloudVisibilityReason.SpaceLayer),
+				VisibilityCase(
+					"underground generator is blocked",
+					new CloudVisibilityInputs(isUndergroundGenerator: true),
+					false,
+					CloudVisibilityReason.UndergroundGenerator),
+				VisibilityCase(
+					"pocket map without sun shadows is blocked",
+					new CloudVisibilityInputs(
+						isPocketMap: true,
+						disableSunShadows: true),
+					false,
+					CloudVisibilityReason.PocketMapWithoutSunShadows),
+				VisibilityCase(
+					"ordinary pocket map is not blanket-blocked",
+					new CloudVisibilityInputs(isPocketMap: true),
+					true,
+					CloudVisibilityReason.Allowed),
+				VisibilityCase(
+					"disabled sun shadows alone do not block a surface map",
+					new CloudVisibilityInputs(disableSunShadows: true),
+					true,
+					CloudVisibilityReason.Allowed),
+				VisibilityCase(
+					"completely roofed map is blocked",
+					new CloudVisibilityInputs(fullyRoofed: true),
+					false,
+					CloudVisibilityReason.FullyRoofed)
+			};
+		}
+
+		static VisibilityContractCase VisibilityCase(
+			string name,
+			CloudVisibilityInputs inputs,
+			bool expectedAllowed,
+			CloudVisibilityReason expectedReason,
+			CloudVisibilitySource expectedSource = CloudVisibilitySource.Automatic)
+		{
+			return new VisibilityContractCase
+			{
+				Name = name,
+				Inputs = inputs,
+				ExpectedAllowed = expectedAllowed,
+				ExpectedReason = expectedReason,
+				ExpectedSource = expectedSource
 			};
 		}
 

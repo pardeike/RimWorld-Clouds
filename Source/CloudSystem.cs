@@ -53,6 +53,7 @@ namespace Clouds
 			clouds = UnityEngine.Object.Instantiate(CloudAssets.cloudSystem);
 			particles = clouds.GetComponent<ParticleSystem>();
 			renderer = clouds.GetComponent<ParticleSystemRenderer>();
+			renderer.enabled = false;
 			baseSpeed = particles.main.simulationSpeed;
 			material = renderer.materials[0];
 			material.renderQueue = MatBases.FogOfWar.renderQueue + 100;

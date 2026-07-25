@@ -1,5 +1,6 @@
 ﻿using Brrainz;
 using HarmonyLib;
+using RimWorld.Planet;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -131,37 +132,27 @@ namespace Clouds
 		public static void Postfix(CameraDriver __instance)
 		{
 			var currentMap = Find.CurrentMap;
-			if (DeactivateClouds(currentMap))
-				return;
-
-			var clouds = CloudAssets.CloudsFor(currentMap, true);
-			clouds.Alpha = GenMath.LerpDoubleClamped(20, 30, 0f, clouds.BaseAlpha, __instance.rootPos.y);
-		}
-		
-		private static bool DeactivateClouds(Map currentMap)
-		{
-			if (CloudVisibility.IsAllowedOn(currentMap) == false)
+			if (CloudViewState.IsWorldView || CloudVisibility.IsAllowedOn(currentMap) == false)
 			{
-				CloudAssets.ApplyToAll(clouds => clouds.Active = false);
-				return true;
+				CloudAssets.DeactivateAll();
+				return;
 			}
 
-			return false;
+			var clouds = CloudAssets.CloudsFor(currentMap);
+			CloudAssets.ActivateOnly(clouds);
+			clouds.Alpha = GenMath.LerpDoubleClamped(20, 30, 0f, clouds.BaseAlpha, __instance.rootPos.y);
 		}
 	}
 
-	public static class CloudVisibility
+	// the world view must never render map clouds, even if a mod keeps a current map selected
+	//
+	[HarmonyPatch(typeof(WorldCameraDriver), nameof(WorldCameraDriver.Update))]
+	public static class WorldCameraDriver_Update_Patch
 	{
-		public static bool IsAllowedOn(Map map)
+		public static void Prefix()
 		{
-			if (map == null)
-				return false;
-
-			var biome = map.Biome;
-			if (biome?.inVacuum == true || biome?.disableSkyLighting == true)
-				return false;
-
-			return map.generatorDef?.isUnderground != true;
+			if (CloudViewState.IsWorldView)
+				CloudAssets.DeactivateAll();
 		}
 	}
 }
