@@ -1,5 +1,6 @@
 using RimWorld;
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using Verse;
 
@@ -35,6 +36,7 @@ namespace Clouds
 		readonly Material material;
 		readonly float baseSpeed;
 		readonly float baseAlpha;
+		readonly bool billboardVariationStreamEnabled;
 		WeatherCloudProfile appliedProfile;
 		bool hasAppliedProfile;
 		float effectiveWindSpeed = 1f;
@@ -54,8 +56,24 @@ namespace Clouds
 			particles = clouds.GetComponent<ParticleSystem>();
 			renderer = clouds.GetComponent<ParticleSystemRenderer>();
 			renderer.enabled = false;
+			renderer.enableGPUInstancing = false;
+			var vertexStreams = new List<ParticleSystemVertexStream>
+			{
+				ParticleSystemVertexStream.Position,
+				ParticleSystemVertexStream.Normal,
+				ParticleSystemVertexStream.Color,
+				ParticleSystemVertexStream.UV,
+				ParticleSystemVertexStream.StableRandomX
+			};
+			renderer.SetActiveVertexStreams(vertexStreams);
+			var activeVertexStreams = new List<ParticleSystemVertexStream>();
+			renderer.GetActiveVertexStreams(activeVertexStreams);
+			billboardVariationStreamEnabled =
+				renderer.renderMode == ParticleSystemRenderMode.Billboard
+				&& activeVertexStreams.Contains(ParticleSystemVertexStream.StableRandomX);
 			baseSpeed = particles.main.simulationSpeed;
 			material = renderer.materials[0];
+			material.enableInstancing = false;
 			material.renderQueue = MatBases.FogOfWar.renderQueue + 100;
 			baseAlpha = material.color.a;
 			clouds.transform.position = position;
@@ -203,8 +221,8 @@ namespace Clouds
 		internal int ParticleCount => particles.particleCount;
 		internal float MaxLifetime => particles.main.startLifetime.constantMax;
 		internal bool ClusterTextureAssigned => material.GetTexture(ClusterTextureProperty) != null;
-		internal bool GpuInstancingEnabled => renderer.enableGPUInstancing;
-		internal bool MaterialInstancingEnabled => material.enableInstancing;
+		internal bool BillboardVariationStreamEnabled => billboardVariationStreamEnabled;
+		internal string RendererMode => renderer.renderMode.ToString();
 		internal bool ShaderSupported => material.shader?.isSupported == true;
 		internal int ShaderPassCount => material.passCount;
 		internal string ShaderName => material.shader?.name ?? string.Empty;

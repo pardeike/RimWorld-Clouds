@@ -1,4 +1,5 @@
 ﻿using UnityEditor;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
@@ -8,6 +9,7 @@ public class CreateAssetBundles
 	public static void BuildStandaloneAssetBundles()
 	{
 		GenerateCloudClusterTexture.GenerateAndValidate();
+		ConfigureAndValidateCloudRenderer();
 		ValidateCloudEntryGeometry();
 		AssetDatabase.SaveAssets();
 
@@ -16,6 +18,36 @@ public class CreateAssetBundles
 		Build(path, RuntimePlatform.WindowsPlayer, BuildTarget.StandaloneWindows64);
 		Build(path, RuntimePlatform.LinuxPlayer, BuildTarget.StandaloneLinux64);
 		Build(path, RuntimePlatform.OSXPlayer, BuildTarget.StandaloneOSX);
+	}
+
+	static void ConfigureAndValidateCloudRenderer()
+	{
+		var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/CloudSystem.prefab");
+		if (prefab == null)
+			throw new IOException("CloudSystem.prefab could not be loaded for renderer validation.");
+
+		var renderer = prefab.GetComponent<ParticleSystemRenderer>();
+		if (renderer == null)
+			throw new IOException("CloudSystem.prefab has no ParticleSystemRenderer.");
+		if (renderer.renderMode != ParticleSystemRenderMode.Billboard)
+			throw new IOException("CloudSystem.prefab must remain in Billboard render mode.");
+
+		renderer.enableGPUInstancing = false;
+		var vertexStreams = new List<ParticleSystemVertexStream>
+		{
+			ParticleSystemVertexStream.Position,
+			ParticleSystemVertexStream.Normal,
+			ParticleSystemVertexStream.Color,
+			ParticleSystemVertexStream.UV,
+			ParticleSystemVertexStream.StableRandomX
+		};
+		renderer.SetActiveVertexStreams(vertexStreams);
+		EditorUtility.SetDirty(renderer);
+
+		var activeVertexStreams = new List<ParticleSystemVertexStream>();
+		renderer.GetActiveVertexStreams(activeVertexStreams);
+		if (activeVertexStreams.Contains(ParticleSystemVertexStream.StableRandomX) == false)
+			throw new IOException("CloudSystem.prefab is missing the StableRandomX vertex stream.");
 	}
 
 	static void ValidateCloudEntryGeometry()

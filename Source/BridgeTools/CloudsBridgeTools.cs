@@ -20,7 +20,11 @@ namespace Clouds.BridgeTools
 		sealed class SuiteRestoreState
 		{
 			public Map Map;
-			public WeatherDef Weather;
+			public WeatherDef CurrentWeather;
+			public WeatherDef LastWeather;
+			public int CurrentWeatherAge;
+			public float PreviousSkyTargetLerp;
+			public float CurrentSkyTargetLerp;
 			public float CameraRootSize;
 			public TimeSpeed TimeSpeed;
 			public bool HadCloudSystem;
@@ -33,7 +37,8 @@ namespace Clouds.BridgeTools
 			public float RootSize;
 			public WeatherCloudProfile Profile;
 			public bool ClusterTextureAssigned;
-			public bool GpuInstancingEnabled;
+			public bool BillboardVariationStreamEnabled;
+			public string RendererMode;
 			public string ShaderName;
 			public int ParticleCount;
 			public float Alpha;
@@ -46,6 +51,7 @@ namespace Clouds.BridgeTools
 			public bool ExpectedAllowed;
 			public CloudVisibilityReason ExpectedReason;
 			public CloudVisibilitySource ExpectedSource;
+			public CloudMapMetadataState? MetadataState;
 		}
 
 		[Tool(
@@ -92,7 +98,10 @@ namespace Clouds.BridgeTools
 			foreach (var contract in cases)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
-				var actual = CloudVisibility.Decide(contract.Inputs);
+				var actual = contract.MetadataState.HasValue
+					? CloudVisibility.DecideBeforeRoof(contract.Inputs, contract.MetadataState.Value)
+						?? CloudVisibility.Decide(contract.Inputs)
+					: CloudVisibility.Decide(contract.Inputs);
 				var passed = actual.Allowed == contract.ExpectedAllowed
 					&& actual.Reason == contract.ExpectedReason
 					&& actual.Source == contract.ExpectedSource;
@@ -102,6 +111,8 @@ namespace Clouds.BridgeTools
 					details: new
 					{
 						inputs = DescribeVisibilityInputs(contract.Inputs),
+						metadataState = contract.MetadataState?.ToString()
+							?? CloudMapMetadataState.Complete.ToString(),
 						expected = new
 						{
 							allowed = contract.ExpectedAllowed,
@@ -190,7 +201,7 @@ namespace Clouds.BridgeTools
 			[ToolParameter(Description = "Comma-separated exact WeatherDef names, or all.", DefaultValue = DefaultWeatherDefs)] string weatherDefs = DefaultWeatherDefs,
 			[ToolParameter(Description = "Comma-separated camera root sizes from 12 through 60.", DefaultValue = DefaultRootSizes)] string rootSizes = DefaultRootSizes,
 			[ToolParameter(Description = "Capture id used in screenshot file names; a UTC timestamp is generated when omitted.", DefaultValue = "")] string captureId = "",
-			[ToolParameter(Description = "Restore camera, pause state, particle seed behavior, and the original weather when finished.", DefaultValue = true)] bool restoreState = true)
+			[ToolParameter(Description = "Restore camera, pause state, particle seed behavior, and the exact current/last weather manager state when finished.", DefaultValue = true)] bool restoreState = true)
 		{
 			if (ctx == null)
 				return new { success = false, error = "RimBridge SDK context was not injected." };
@@ -230,6 +241,7 @@ namespace Clouds.BridgeTools
 			};
 
 			SuiteRestoreState original = null;
+			SuiteRestoreState restored = null;
 			var weatherStates = new List<WeatherCaptureState>();
 			try
 			{
@@ -289,7 +301,8 @@ namespace Clouds.BridgeTools
 							RootSize = actualRootSize,
 							Profile = weatherState.Profile,
 							ClusterTextureAssigned = weatherState.ClusterTextureAssigned,
-							GpuInstancingEnabled = weatherState.GpuInstancingEnabled,
+							BillboardVariationStreamEnabled = weatherState.BillboardVariationStreamEnabled,
+							RendererMode = weatherState.RendererMode,
 							ShaderName = weatherState.ShaderName,
 							ParticleCount = weatherState.ParticleCount,
 							Alpha = weatherState.Alpha
@@ -328,8 +341,12 @@ namespace Clouds.BridgeTools
 				{
 					try
 					{
-						await ctx.MainThread.InvokeAsync(
-							() => RestoreSuiteState(original),
+						restored = await ctx.MainThread.InvokeAsync(
+							() =>
+							{
+								RestoreSuiteState(original);
+								return CaptureSuiteRestoreState();
+							},
 							CancellationToken.None);
 						await ctx.Game.FramesAsync(2, CancellationToken.None);
 					}
@@ -343,6 +360,18 @@ namespace Clouds.BridgeTools
 						});
 					}
 				}
+			}
+
+			if (restoreState && original != null)
+			{
+				manifest.assertions.Add(RimBridgeEvidence.IsTrue(
+					"weather manager state restored exactly",
+					WeatherManagerStateMatches(original, restored),
+					details: new
+					{
+						before = DescribeWeatherManagerState(original),
+						after = DescribeWeatherManagerState(restored)
+					}));
 			}
 
 			var expectedCaptureCount = weatherSelection.Weather.Count * parsedRoots.Count;
@@ -372,11 +401,12 @@ namespace Clouds.BridgeTools
 					&& state.Alpha <= 0.51f),
 				details: weatherStates.Select(DescribeCaptureState).ToArray()));
 			manifest.assertions.Add(RimBridgeEvidence.IsTrue(
-				"GPU shader clustering remains subtle and never cuts artificial holes",
+				"GPU shader uses billboard random streams and subtle clustering",
 				weatherStates.Count == expectedCaptureCount
 					&& weatherStates.All(state =>
 						state.ClusterTextureAssigned
-						&& state.GpuInstancingEnabled
+						&& state.BillboardVariationStreamEnabled
+						&& state.RendererMode == ParticleSystemRenderMode.Billboard.ToString()
 						&& state.ShaderName == "Clouds/CloudParticle"
 						&& state.Profile.ClusterCutoff >= 0.22f),
 				"The shared world-space mask only modulates cloud alpha between 0.72 and 1.0. Map readability comes from the bounded particle density, size, and base alpha.",
@@ -424,6 +454,8 @@ namespace Clouds.BridgeTools
 					current = manager.curWeather?.defName,
 					last = manager.lastWeather?.defName,
 					transitionAge = manager.curWeatherAge,
+					previousSkyTargetLerp = manager.prevSkyTargetLerp,
+					currentSkyTargetLerp = manager.currSkyTargetLerp,
 					transitionTicks = WeatherManager.TransitionTicks,
 					transitionProgress = manager.TransitionLerpFactor,
 					currentProfile = DescribeProfile(WeatherCloudProfiles.For(manager.curWeather)),
@@ -446,8 +478,8 @@ namespace Clouds.BridgeTools
 					maxLifetime = clouds.MaxLifetime,
 					clusterOffset = new { x = clouds.ClusterOffset.x, y = clouds.ClusterOffset.y },
 					clusterTextureAssigned = clouds.ClusterTextureAssigned,
-					gpuInstancingEnabled = clouds.GpuInstancingEnabled,
-					materialInstancingEnabled = clouds.MaterialInstancingEnabled,
+					billboardVariationStreamEnabled = clouds.BillboardVariationStreamEnabled,
+					rendererMode = clouds.RendererMode,
 					shaderSupported = clouds.ShaderSupported,
 					shaderPassCount = clouds.ShaderPassCount,
 					shader = clouds.ShaderName,
@@ -570,6 +602,41 @@ namespace Clouds.BridgeTools
 					true,
 					CloudVisibilityReason.Allowed),
 				VisibilityCase(
+					"generator Allow works without tile metadata",
+					new CloudVisibilityInputs(generatorMode: CloudVisibilityMode.Allow),
+					true,
+					CloudVisibilityReason.ExplicitAllow,
+					CloudVisibilitySource.MapGeneratorExtension,
+					CloudMapMetadataState.Unavailable),
+				VisibilityCase(
+					"generator Block works without tile metadata",
+					new CloudVisibilityInputs(generatorMode: CloudVisibilityMode.Block),
+					false,
+					CloudVisibilityReason.ExplicitBlock,
+					CloudVisibilitySource.MapGeneratorExtension,
+					CloudMapMetadataState.Unavailable),
+				VisibilityCase(
+					"planet layer Allow survives a missing biome",
+					new CloudVisibilityInputs(planetLayerMode: CloudVisibilityMode.Allow),
+					true,
+					CloudVisibilityReason.ExplicitAllow,
+					CloudVisibilitySource.PlanetLayerExtension,
+					CloudMapMetadataState.Partial),
+				VisibilityCase(
+					"planet layer Block survives a missing biome",
+					new CloudVisibilityInputs(planetLayerMode: CloudVisibilityMode.Block),
+					false,
+					CloudVisibilityReason.ExplicitBlock,
+					CloudVisibilitySource.PlanetLayerExtension,
+					CloudMapMetadataState.Partial),
+				VisibilityCase(
+					"partial automatic metadata remains conservatively blocked",
+					new CloudVisibilityInputs(hasMap: true),
+					false,
+					CloudVisibilityReason.MapMetadataUnavailable,
+					CloudVisibilitySource.Automatic,
+					CloudMapMetadataState.Partial),
+				VisibilityCase(
 					"generator Block overrides automatic detection",
 					new CloudVisibilityInputs(generatorMode: CloudVisibilityMode.Block),
 					false,
@@ -677,7 +744,8 @@ namespace Clouds.BridgeTools
 			CloudVisibilityInputs inputs,
 			bool expectedAllowed,
 			CloudVisibilityReason expectedReason,
-			CloudVisibilitySource expectedSource = CloudVisibilitySource.Automatic)
+			CloudVisibilitySource expectedSource = CloudVisibilitySource.Automatic,
+			CloudMapMetadataState? metadataState = null)
 		{
 			return new VisibilityContractCase
 			{
@@ -685,7 +753,8 @@ namespace Clouds.BridgeTools
 				Inputs = inputs,
 				ExpectedAllowed = expectedAllowed,
 				ExpectedReason = expectedReason,
-				ExpectedSource = expectedSource
+				ExpectedSource = expectedSource,
+				MetadataState = metadataState
 			};
 		}
 
@@ -730,7 +799,8 @@ namespace Clouds.BridgeTools
 				RootSize = Find.CameraDriver.RootSize,
 				Profile = clouds.AppliedProfile,
 				ClusterTextureAssigned = clouds.ClusterTextureAssigned,
-				GpuInstancingEnabled = clouds.GpuInstancingEnabled,
+				BillboardVariationStreamEnabled = clouds.BillboardVariationStreamEnabled,
+				RendererMode = clouds.RendererMode,
 				ShaderName = clouds.ShaderName,
 				ParticleCount = clouds.ParticleCount,
 				Alpha = clouds.Alpha
@@ -743,7 +813,11 @@ namespace Clouds.BridgeTools
 			var state = new SuiteRestoreState
 			{
 				Map = map,
-				Weather = map?.weatherManager?.curWeather,
+				CurrentWeather = map?.weatherManager?.curWeather,
+				LastWeather = map?.weatherManager?.lastWeather,
+				CurrentWeatherAge = map?.weatherManager?.curWeatherAge ?? 0,
+				PreviousSkyTargetLerp = map?.weatherManager?.prevSkyTargetLerp ?? -1f,
+				CurrentSkyTargetLerp = map?.weatherManager?.currSkyTargetLerp ?? -1f,
 				CameraRootSize = Find.CameraDriver?.RootSize ?? 0f,
 				TimeSpeed = Find.TickManager?.CurTimeSpeed ?? TimeSpeed.Paused
 			};
@@ -760,19 +834,21 @@ namespace Clouds.BridgeTools
 			if (state.Map == null)
 				return;
 
-			if (Find.CurrentMap == state.Map && state.Weather != null)
+			if (Find.CurrentMap == state.Map && state.CurrentWeather != null)
 			{
 				var manager = state.Map.weatherManager;
-				manager.TransitionTo(state.Weather);
-				manager.curWeatherAge = Mathf.RoundToInt(WeatherManager.TransitionTicks);
-				manager.ResetSkyTargetLerpCache();
+				manager.curWeather = state.CurrentWeather;
+				manager.lastWeather = state.LastWeather;
+				manager.curWeatherAge = state.CurrentWeatherAge;
+				manager.prevSkyTargetLerp = state.PreviousSkyTargetLerp;
+				manager.currSkyTargetLerp = state.CurrentSkyTargetLerp;
 				if (CloudVisibility.IsAllowedOn(state.Map))
 				{
 					var clouds = CloudAssets.CloudsFor(state.Map, true);
 					clouds.UpdateWeather(manager, Find.TickManager, false, true);
 					if (state.HadCloudSystem)
 					{
-						clouds.RestartAndPrewarm(StableSeed(state.Weather.defName));
+						clouds.RestartAndPrewarm(StableSeed(state.CurrentWeather.defName));
 						clouds.RestoreSeedState(state.ParticleSeed);
 					}
 				}
@@ -782,6 +858,35 @@ namespace Clouds.BridgeTools
 			Find.TickManager.CurTimeSpeed = state.TimeSpeed;
 			if (CloudAssets.TryGetCloudsFor(state.Map, out var restoredClouds))
 				restoredClouds.SynchronizeTime(Find.TickManager);
+		}
+
+		static bool WeatherManagerStateMatches(
+			SuiteRestoreState expected,
+			SuiteRestoreState actual)
+		{
+			return expected != null
+				&& actual != null
+				&& ReferenceEquals(expected.Map, actual.Map)
+				&& expected.CurrentWeather == actual.CurrentWeather
+				&& expected.LastWeather == actual.LastWeather
+				&& expected.CurrentWeatherAge == actual.CurrentWeatherAge
+				&& expected.PreviousSkyTargetLerp.Equals(actual.PreviousSkyTargetLerp)
+				&& expected.CurrentSkyTargetLerp.Equals(actual.CurrentSkyTargetLerp);
+		}
+
+		static object DescribeWeatherManagerState(SuiteRestoreState state)
+		{
+			return state == null
+				? null
+				: new
+				{
+					mapId = state.Map?.uniqueID,
+					current = state.CurrentWeather?.defName,
+					last = state.LastWeather?.defName,
+					currentWeatherAge = state.CurrentWeatherAge,
+					previousSkyTargetLerp = state.PreviousSkyTargetLerp,
+					currentSkyTargetLerp = state.CurrentSkyTargetLerp
+				};
 		}
 
 		static object DescribeProfile(WeatherCloudProfile profile)
@@ -821,7 +926,8 @@ namespace Clouds.BridgeTools
 				rootSize = state.RootSize,
 				profile = DescribeProfile(state.Profile),
 				state.ClusterTextureAssigned,
-				state.GpuInstancingEnabled,
+				state.BillboardVariationStreamEnabled,
+				state.RendererMode,
 				state.ShaderName,
 				state.ParticleCount,
 				state.Alpha

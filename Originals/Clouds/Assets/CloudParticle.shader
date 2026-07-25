@@ -41,19 +41,17 @@ Shader "Clouds/CloudParticle"
 			CGPROGRAM
 			#pragma vertex Vert
 			#pragma fragment Frag
-			#pragma target 4.5
-			#pragma multi_compile_instancing
-			#pragma instancing_options procedural:vertInstancingSetup
+			#pragma target 3.0
 
 			#include "UnityCG.cginc"
-			#include "UnityStandardParticleInstancing.cginc"
 
 			struct VertexInput
 			{
 				float4 vertex : POSITION;
+				float3 normal : NORMAL;
 				fixed4 color : COLOR;
 				float2 texCoord : TEXCOORD0;
-				UNITY_VERTEX_INPUT_INSTANCE_ID
+				float stableRandom : TEXCOORD1;
 			};
 
 			struct VertexOutput
@@ -84,15 +82,9 @@ Shader "Clouds/CloudParticle"
 
 			VertexOutput Vert(VertexInput input)
 			{
-				UNITY_SETUP_INSTANCE_ID(input);
 				fixed4 particleColor = input.color;
 				float2 particleUV = input.texCoord;
-				float instanceSeed = 1.0;
-#if defined(UNITY_PARTICLE_INSTANCING_ENABLED)
-				vertInstancingColor(particleColor);
-				vertInstancingUVs(input.texCoord, particleUV);
-				instanceSeed = (float)unity_InstanceID + 1.0;
-#endif
+				float particleSeed = input.stableRandom * 65535.0 + 1.0;
 				float4 worldPosition = mul(unity_ObjectToWorld, input.vertex);
 
 				VertexOutput output;
@@ -101,10 +93,10 @@ Shader "Clouds/CloudParticle"
 				output.texCoord = TRANSFORM_TEX(particleUV, _MainTex);
 				output.worldXZ = worldPosition.xz;
 				output.weatherVariation = float4(
-					ParticleHash(instanceSeed),
-					ParticleHash(instanceSeed + 17.0),
-					ParticleHash(instanceSeed + 43.0),
-					ParticleHash(instanceSeed + 101.0));
+					ParticleHash(particleSeed),
+					ParticleHash(particleSeed + 17.0),
+					ParticleHash(particleSeed + 43.0),
+					ParticleHash(particleSeed + 101.0));
 				return output;
 			}
 

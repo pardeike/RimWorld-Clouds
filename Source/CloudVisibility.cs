@@ -41,6 +41,13 @@ namespace Clouds
 		PlanetLayerExtension
 	}
 
+	internal enum CloudMapMetadataState
+	{
+		Unavailable,
+		Partial,
+		Complete
+	}
+
 	internal readonly struct CloudVisibilityDecision
 	{
 		internal readonly bool Allowed;
@@ -200,9 +207,9 @@ namespace Clouds
 
 		internal static CloudVisibilityDecision Decide(CloudVisibilityInputs inputs)
 		{
-			var knownDecision = DecideKnownSignals(inputs);
-			if (knownDecision.HasValue)
-				return knownDecision.Value;
+			var decision = DecideBeforeRoof(inputs, CloudMapMetadataState.Complete);
+			if (decision.HasValue)
+				return decision.Value;
 
 			if (inputs.FullyRoofed)
 				return new CloudVisibilityDecision(false, CloudVisibilityReason.FullyRoofed);
@@ -226,13 +233,19 @@ namespace Clouds
 		static CloudVisibilityEvaluation EvaluateMap(Map map, out bool cacheable)
 		{
 			var generator = map.generatorDef;
-			if (TryGetMapMetadata(map, out var biome, out var planetLayer) == false)
+			var generatorMode = ExtensionMode(generator);
+			var generatorOverride = ExtensionDecision(
+				generatorMode,
+				CloudVisibilitySource.MapGeneratorExtension);
+			if (generatorOverride.HasValue)
 			{
-				cacheable = false;
-				var unavailableInputs = new CloudVisibilityInputs(hasMap: true);
+				cacheable = true;
+				var generatorInputs = new CloudVisibilityInputs(
+					hasMap: true,
+					generatorMode: generatorMode);
 				return new CloudVisibilityEvaluation(
-					new CloudVisibilityDecision(false, CloudVisibilityReason.MapMetadataUnavailable),
-					unavailableInputs,
+					generatorOverride.Value,
+					generatorInputs,
 					generator,
 					null,
 					null,
@@ -240,23 +253,24 @@ namespace Clouds
 					0);
 			}
 
-			cacheable = true;
+			var metadataState = GetMapMetadataState(map, out var biome, out var planetLayer);
 			var inputs = new CloudVisibilityInputs(
-				generatorMode: ExtensionMode(generator),
+				generatorMode: generatorMode,
 				biomeMode: ExtensionMode(biome),
 				planetLayerMode: ExtensionMode(planetLayer),
 				inVacuum: biome?.inVacuum == true,
 				disableSkyLighting: biome?.disableSkyLighting == true,
 				isSpaceLayer: planetLayer?.isSpace == true,
 				isUndergroundGenerator: generator?.isUnderground == true,
-				isPocketMap: map.info.isPocketMap,
+				isPocketMap: map.info?.isPocketMap == true,
 				disableSunShadows: map.info?.disableSunShadows == true);
 
-			var knownDecision = DecideKnownSignals(inputs);
-			if (knownDecision.HasValue)
+			var decision = DecideBeforeRoof(inputs, metadataState);
+			if (decision.HasValue)
 			{
+				cacheable = decision.Value.Reason != CloudVisibilityReason.MapMetadataUnavailable;
 				return new CloudVisibilityEvaluation(
-					knownDecision.Value,
+					decision.Value,
 					inputs,
 					generator,
 					biome,
@@ -265,6 +279,7 @@ namespace Clouds
 					0);
 			}
 
+			cacheable = true;
 			var fullyRoofed = IsCompletelyRoofed(map, out var roofGridScanned, out var roofCellsChecked);
 			inputs = inputs.WithFullyRoofed(fullyRoofed);
 			return new CloudVisibilityEvaluation(
@@ -277,7 +292,9 @@ namespace Clouds
 				roofCellsChecked);
 		}
 
-		static CloudVisibilityDecision? DecideKnownSignals(CloudVisibilityInputs inputs)
+		internal static CloudVisibilityDecision? DecideBeforeRoof(
+			CloudVisibilityInputs inputs,
+			CloudMapMetadataState metadataState)
 		{
 			if (inputs.HasMap == false)
 				return new CloudVisibilityDecision(false, CloudVisibilityReason.NoMap);
@@ -285,6 +302,9 @@ namespace Clouds
 			var decision = ExtensionDecision(inputs.GeneratorMode, CloudVisibilitySource.MapGeneratorExtension);
 			if (decision.HasValue)
 				return decision;
+
+			if (metadataState == CloudMapMetadataState.Unavailable)
+				return new CloudVisibilityDecision(false, CloudVisibilityReason.MapMetadataUnavailable);
 
 			decision = ExtensionDecision(inputs.BiomeMode, CloudVisibilitySource.BiomeExtension);
 			if (decision.HasValue)
@@ -304,6 +324,9 @@ namespace Clouds
 				return new CloudVisibilityDecision(false, CloudVisibilityReason.UndergroundGenerator);
 			if (inputs.IsPocketMap && inputs.DisableSunShadows)
 				return new CloudVisibilityDecision(false, CloudVisibilityReason.PocketMapWithoutSunShadows);
+
+			if (metadataState == CloudMapMetadataState.Partial)
+				return new CloudVisibilityDecision(false, CloudVisibilityReason.MapMetadataUnavailable);
 
 			return null;
 		}
@@ -329,7 +352,7 @@ namespace Clouds
 				?? CloudVisibilityMode.Automatic;
 		}
 
-		static bool TryGetMapMetadata(
+		static CloudMapMetadataState GetMapMetadataState(
 			Map map,
 			out BiomeDef biome,
 			out PlanetLayerDef planetLayer)
@@ -337,23 +360,25 @@ namespace Clouds
 			biome = null;
 			planetLayer = null;
 			if (map.info == null)
-				return false;
+				return CloudMapMetadataState.Unavailable;
 			if (map.info.isPocketMap == false && Find.WorldGrid == null)
-				return false;
+				return CloudMapMetadataState.Unavailable;
 
 			try
 			{
 				var tile = map.TileInfo;
 				if (tile == null)
-					return false;
+					return CloudMapMetadataState.Unavailable;
 
 				biome = tile.PrimaryBiome;
 				planetLayer = tile.Layer?.Def;
-				return biome != null;
+				return biome == null
+					? CloudMapMetadataState.Partial
+					: CloudMapMetadataState.Complete;
 			}
 			catch (Exception)
 			{
-				return false;
+				return CloudMapMetadataState.Unavailable;
 			}
 		}
 
