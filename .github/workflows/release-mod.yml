@@ -99,7 +99,7 @@ jobs:
       - name: Build mod
         env:
           RIMWORLD_MOD_DIR: ""
-        run: dotnet build "$MOD_PROJECT" -c Release
+        run: dotnet build "$MOD_PROJECT" -c Release -p:BuildBridgeTools=false
 
       - name: Package mod zip
         run: |
@@ -113,14 +113,58 @@ jobs:
           rm -rf "$PACKAGE_ROOT" dist
           mkdir -p dist "$STAGE_DIR"
 
-          dotnet build "$MOD_PROJECT" -c Release --no-restore -p:RIMWORLD_MOD_DIR="$PACKAGE_ROOT"
+          dotnet build "$MOD_PROJECT" -c Release --no-restore \
+            -p:BuildBridgeTools=false \
+            -p:RIMWORLD_MOD_DIR="$PACKAGE_ROOT"
 
           cp -R "$PACKAGE_DIR"/. "$STAGE_DIR"/
+
+          FORBIDDEN_STAGE_CONTENT="$(
+            find "$STAGE_DIR" \
+              \( -type d -name BridgeTools \
+              -o -type f \( -name '*.BridgeTools.dll' \
+              -o -name 'RimBridgeServer.Sdk.*' \
+              -o -name 'RimBridgeServer.Annotations.*' \) \) \
+              -print
+          )"
+          if [ -n "$FORBIDDEN_STAGE_CONTENT" ]; then
+            echo "Release staging contains development-only BridgeTools artifacts:" >&2
+            printf '%s\n' "$FORBIDDEN_STAGE_CONTENT" >&2
+            exit 1
+          fi
 
           (
             cd dist
             zip -qr "$ARCHIVE_NAME" "$(basename "$STAGE_DIR")"
           )
+
+          python3 - "dist/$ARCHIVE_NAME" <<'PY'
+          import sys
+          import zipfile
+          from pathlib import PurePosixPath
+
+          archive = sys.argv[1]
+          forbidden = []
+          with zipfile.ZipFile(archive) as package:
+              for entry in package.namelist():
+                  path = PurePosixPath(entry)
+                  name = path.name
+                  if (
+                      "BridgeTools" in path.parts
+                      or name.endswith(".BridgeTools.dll")
+                      or name.startswith("RimBridgeServer.Sdk.")
+                      or name.startswith("RimBridgeServer.Annotations.")
+                  ):
+                      forbidden.append(entry)
+
+          if forbidden:
+              print(
+                  "Release package contains development-only BridgeTools artifacts:",
+                  file=sys.stderr,
+              )
+              print(*forbidden, sep="\n", file=sys.stderr)
+              raise SystemExit(1)
+          PY
 
       - name: Create GitHub release if needed
         env:
