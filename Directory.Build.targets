@@ -1,0 +1,13 @@
+<Project>
+	<!-- Publicizer 2.3.2 emits an empty assembly name with this SDK. Set the CoreCLR access target explicitly. -->
+	<Target Name="SetPublicizedAssemblyAccess" AfterTargets="PublicizeAssemblies">
+		<ItemGroup>
+			<!-- The companion can use the owner's internal attribute through InternalsVisibleTo. -->
+			<Compile Remove="@(Compile)" Condition="'$(MSBuildProjectName)' == 'Clouds.BridgeTools' And '%(Compile.Filename)' == 'IgnoresAccessChecksToAttribute'" />
+			<AssemblyAttribute Remove="System.Runtime.CompilerServices.IgnoresAccessChecksToAttribute" />
+			<AssemblyAttribute Include="System.Runtime.CompilerServices.IgnoresAccessChecksToAttribute">
+				<_Parameter1>Assembly-CSharp</_Parameter1>
+			</AssemblyAttribute>
+		</ItemGroup>
+	</Target>
+</Project>

@@ -14,7 +14,7 @@ namespace Clouds
 		public Clouds_Main(ModContentPack content) : base(content)
 		{
 			var harmony = new Harmony("net.pardeike.clouds");
-			harmony.PatchAll();
+			harmony.PatchAll(typeof(Clouds_Main).Assembly);
 
 			CrossPromotion.Install(76561197973010050);
 		}

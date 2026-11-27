@@ -1,0 +1,43 @@
+{
+  "sourceHost": "mba.home.arpa",
+  "sourceRepository": "/Users/ap/Projects/RimWorld-Clouds",
+  "captured": "2026-10-31",
+  "activeBuildInput": false,
+  "files": [
+    {
+      "snapshot": "UnityPackageFiles/manifest.json",
+      "source": "Originals/Clouds/Packages/manifest.json",
+      "sha256": "98b0f74110da34cfa5439cd6a99790f943be64fa378c8fcf9132720c0b2e5991"
+    },
+    {
+      "snapshot": "UnityPackageFiles/packages-lock.json",
+      "source": "Originals/Clouds/Packages/packages-lock.json",
+      "sha256": "2c321ca87cdd23a716bf445f64a92c9bd9dd66aadd984092faf34b41aee811af"
+    },
+    {
+      "snapshot": "UnityMetadata/Originals/Clouds/Assets/Editor.meta",
+      "source": "Originals/Clouds/Assets/Editor.meta",
+      "sha256": "666f2d4f3890c92699c96ded454b877bc21b50353781f3ccb48544f3ebe6b71b"
+    },
+    {
+      "snapshot": "UnityMetadata/Originals/Clouds/Assets/Scenes.meta",
+      "source": "Originals/Clouds/Assets/Scenes.meta",
+      "sha256": "77b3f904196e57b2a979f05f143ace44f218394c12737b4078ab22f126d4fcd3"
+    },
+    {
+      "snapshot": "UnityMetadata/Originals/Clouds/Assets/Scenes/SampleScene.unity.meta",
+      "source": "Originals/Clouds/Assets/Scenes/SampleScene.unity.meta",
+      "sha256": "34c0bb139c0110d9e174dc193b51032fc936efa2fd7764eb82318fb6a6fce5c0"
+    },
+    {
+      "snapshot": "UnityMetadata/Originals/Clouds/Assets/Editor/Export.cs.meta",
+      "source": "Originals/Clouds/Assets/Editor/Export.cs.meta",
+      "sha256": "dbd524da05f3711178bfc0aaecc730795706dc6fdd5521463a8a5fbcdef6c2a8"
+    },
+    {
+      "snapshot": "UnityMetadata/Originals/Clouds/Assets/Editor/GenerateCloudClusterTexture.cs.meta",
+      "source": "Originals/Clouds/Assets/Editor/GenerateCloudClusterTexture.cs.meta",
+      "sha256": "42a71031407c04eb4df887cd7cc615b0d268985394eac0a187debe3eec2f8e99"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+	<ShaderDef>
+		<defName>CloudsCloudParticle</defName>
+		<shaderProgram>
+			<vertexShaderFileName>CloudParticle.vert.glsl</vertexShaderFileName>
+			<fragmentShaderFileName>CloudParticle.frag.glsl</fragmentShaderFileName>
+			<transparent>true</transparent>
+			<blendMode>Custom</blendMode>
+			<blendSrcFactor>SrcAlpha</blendSrcFactor>
+			<blendDstFactor>OneMinusSrcAlpha</blendDstFactor>
+			<depthTest>true</depthTest>
+			<depthWrite>false</depthWrite>
+			<colorWrite>true</colorWrite>
+			<cullMode>Back</cullMode>
+			<stencilEnabled>true</stencilEnabled>
+			<stencilCompare>Equal</stencilCompare>
+			<stencilPassOp>Keep</stencilPassOp>
+			<stencilFailOp>Keep</stencilFailOp>
+			<stencilDepthFailOp>Keep</stencilDepthFailOp>
+			<stencilRef>0</stencilRef>
+			<stencilReadMask>17</stencilReadMask>
+			<stencilWriteMask>255</stencilWriteMask>
+			<renderQueue>3201</renderQueue>
+		</shaderProgram>
+	</ShaderDef>
+</Defs>

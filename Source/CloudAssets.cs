@@ -17,9 +17,32 @@ namespace Clouds
 		static CloudAssets()
 		{
 			assets = LoadAssetBundle();
+			if (assets == null)
+				throw new InvalidOperationException("Clouds could not load its RimWorld 1.7 asset bundle.");
 			cloudSystem = assets.LoadAsset<GameObject>("CloudSystem");
+			if (cloudSystem == null)
+				throw new InvalidOperationException("The Clouds asset bundle does not contain CloudSystem.");
+			ReplaceCloudShader(cloudSystem);
 			clouds = [];
 			UnityEngine.Object.DontDestroyOnLoad(cloudSystem);
+		}
+
+		static void ReplaceCloudShader(GameObject prefab)
+		{
+			var shader = DefDatabase<ShaderDef>.GetNamed("CloudsCloudParticle").Shader;
+			var replaced = 0;
+			foreach (var renderer in prefab.GetComponentsInChildren<Renderer>(true))
+				foreach (var material in renderer.sharedMaterials)
+				{
+					if (material == null || material.shader == null || material.shader.name != "Clouds/CloudParticle")
+						continue;
+					var renderQueue = material.renderQueue;
+					material.shader = shader;
+					material.renderQueue = renderQueue;
+					replaced++;
+				}
+			if (replaced == 0)
+				throw new InvalidOperationException("CloudSystem has no Clouds/CloudParticle material to replace.");
 		}
 
 		public static string GetModRootDirectory()
@@ -30,8 +53,15 @@ namespace Clouds
 
 		public static AssetBundle LoadAssetBundle()
 		{
-
-			var path = Path.Combine(GetModRootDirectory(), "Resources", "Clouds" + Application.platform);
+			var platform = Application.platform switch
+			{
+				RuntimePlatform.WindowsPlayer or RuntimePlatform.WindowsEditor => "win",
+				RuntimePlatform.LinuxPlayer or RuntimePlatform.LinuxEditor => "linux",
+				RuntimePlatform.OSXPlayer or RuntimePlatform.OSXEditor => "mac",
+				_ => throw new PlatformNotSupportedException($"Clouds does not support {Application.platform}.")
+			};
+			// Waylith uses the adjacent _linux bundle when a platform bundle lacks Vulkan shaders.
+			var path = Path.Combine(GetModRootDirectory(), "1.7", "Resources", "clouds_" + platform);
 			return AssetBundle.LoadFromFile(path);
 		}
 

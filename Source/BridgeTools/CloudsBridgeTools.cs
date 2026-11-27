@@ -407,7 +407,7 @@ namespace Clouds.BridgeTools
 						state.ClusterTextureAssigned
 						&& state.BillboardVariationStreamEnabled
 						&& state.RendererMode == ParticleSystemRenderMode.Billboard.ToString()
-						&& state.ShaderName == "Clouds/CloudParticle"
+						&& state.ShaderName == "CloudsCloudParticle"
 						&& state.Profile.ClusterCutoff >= 0.22f),
 				"The shared world-space mask only modulates cloud alpha between 0.72 and 1.0. Map readability comes from the bounded particle density, size, and base alpha.",
 				new

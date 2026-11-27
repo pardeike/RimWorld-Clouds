@@ -1,14 +1,17 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<RootNamespace>$(ModFileName)</RootNamespace>
-		<AssemblyName>$(ModFileName)</AssemblyName>
-		<TargetFramework>net472</TargetFramework>
+		<RootNamespace>Clouds</RootNamespace>
+		<AssemblyName>Clouds</AssemblyName>
+		<TargetFramework>net10.0</TargetFramework>
 		<LangVersion>latest</LangVersion>
-		<PlatformTarget>x64</PlatformTarget>
-		<OutputPath>..\1.6\Assemblies\</OutputPath>
+		<PlatformTarget>AnyCPU</PlatformTarget>
+		<OutputPath>..\1.7\Assemblies\</OutputPath>
 		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+		<GenerateDependencyFile>false</GenerateDependencyFile>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+		<AssetTargetFallback>$(AssetTargetFallback);net472</AssetTargetFallback>
 		<Version>$(ModVersion)</Version>
 		<AssemblyVersion>$(ModVersion)</AssemblyVersion>
 		<FileVersion>$(ModVersion)</FileVersion>
@@ -38,6 +41,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Brrainz.RimWorld.CrossPromotion" Version="1.1.2" NoWarn="NU1701" />
 		<Compile Remove="BridgeTools\**\*.cs" />
 		<None Include="BridgeTools\**\*" />
 		<Content Include="..\Directory.Build.props">
@@ -46,89 +50,41 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Brrainz.RimWorld.CrossPromotion" Version="1.1.2" />
-		<PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4871" GeneratePathProperty="true" />
-		<PackageReference Include="Lib.Harmony" Version="2.3.6" ExcludeAssets="runtime" />
-		<PackageReference Include="Microsoft.NETCore.Platforms" Version="7.0.4" />
-		<PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-		<PackageReference Include="TaskPubliciser" Version="1.0.3" />
+		<PackageReference Include="Krafs.Rimworld.Ref" Version="1.7.5021-unstable" />
+		<PackageReference Include="Lib.Harmony.Ref" Version="3.0.0-rc.8" />
+		<PackageReference Include="Krafs.Publicizer" Version="2.3.2" PrivateAssets="all" />
+		<Publicize Include="Assembly-CSharp" />
 	</ItemGroup>
-
-	<Target Name="MyCode" BeforeTargets="UpdateReferences">
-		<PropertyGroup>
-			<AssemblyCSharp>$(PkgKrafs_Rimworld_Ref)\ref\net472\Assembly-CSharp.dll</AssemblyCSharp>
-			<PubliciseOutputPath>$(PkgKrafs_Rimworld_Ref)\ref\net472\</PubliciseOutputPath>
-			<AssemblyCSharp_Publicised>$(PubliciseOutputPath)Assembly-CSharp_publicised.dll</AssemblyCSharp_Publicised>
-		</PropertyGroup>
-		<Message Importance="High" Text="Publicising Rimworld Assembly ..." />
-		<Publicise TargetAssemblyPath="$(AssemblyCSharp)" OutputPath="$(PubliciseOutputPath)" Condition="Exists('$(AssemblyCSharp)')" />
-		<Message Importance="High" Text="Replacing reference to un-publicised assemblies with publicised equivalents ..." />
-		<ItemGroup>
-			<Reference Include="$(AssemblyCSharp_Publicised)">
-				<SpecificVersion>false</SpecificVersion>
-				<HintPath>$(AssemblyCSharp_Publicised)</HintPath>
-				<Implicit>true</Implicit>
-				<Private>false</Private>
-			</Reference>
-		</ItemGroup>
+	<Target Name="RestoreBridgeTools" BeforeTargets="Build" Condition="'$(BuildBridgeTools)' != 'false' And ('$(RIMWORLD_MOD_DIR)' == '' Or '$(RimworldDeployGuardInner)' == 'true')">
+		<Exec Command="&quot;$(DOTNET_HOST_PATH)&quot; restore &quot;$(MSBuildProjectDirectory)\BridgeTools\Clouds.BridgeTools.csproj&quot; --nologo --verbosity quiet" />
 	</Target>
 
-	<Target Name="UpdateReferences" AfterTargets="ResolveLockFileReferences">
-		<Message Importance="High" Text="Remove References ..." />
-		<ItemGroup>
-			<Reference Remove="$(PkgKrafs_Rimworld_Ref)\ref\net472\Assembly-CSharp.dll" />
-		</ItemGroup>
+	<Target Name="BuildBridgeTools" DependsOnTargets="RestoreBridgeTools" AfterTargets="Build" BeforeTargets="StageMod;_CopyToRimworldUnlocked" Condition="'$(BuildBridgeTools)' != 'false' And ('$(RIMWORLD_MOD_DIR)' == '' Or '$(RimworldDeployGuardInner)' == 'true')">
+		<MSBuild Projects="$(MSBuildProjectDirectory)\BridgeTools\Clouds.BridgeTools.csproj" Targets="Build"
+			Properties="Configuration=$(Configuration);Platform=$(Platform);CloudsAssemblyPath=$(TargetPath)" />
 	</Target>
 
-	<Target Name="PostBuildAction" AfterTargets="Build">
+	<Target Name="StageMod" AfterTargets="Build" DependsOnTargets="BuildBridgeTools" Condition="'$(RimworldDeployGuardInner)' != 'true'">
+		<Exec Command="python3 &quot;$(MSBuildProjectDirectory)\..\scripts\stage-mod.py&quot; &quot;$(TargetPath)&quot;" />
+	</Target>
+
+	<Target Name="SyncModMetadata" BeforeTargets="StageMod">
 		<XmlPoke XmlInputPath="$(MSBuildProjectDirectory)\..\About\About.xml" Query="//ModMetaData/modVersion" Value="$(ModVersion)" />
 		<XmlPoke XmlInputPath="$(MSBuildProjectDirectory)\..\About\Manifest.xml" Query="//Manifest/version" Value="$(ModVersion)" />
 	</Target>
 
-	<Target Name="RestoreBridgeTools" BeforeTargets="Build" Condition="'$(BuildBridgeTools)' != 'false'">
-		<MSBuild
-			Projects="$(MSBuildProjectDirectory)\BridgeTools\Clouds.BridgeTools.csproj"
-			Targets="Restore"
-			Properties="Configuration=$(Configuration);Platform=$(Platform)" />
+	<Target Name="ValidateRimworldDeployRoot" BeforeTargets="Build;CopyToRimworld" Condition="'$(RIMWORLD_MOD_DIR)' != '' And '$(RimworldDeployGuardInner)' != 'true'">
+		<Exec Command="&quot;$(MSBuildProjectDirectory)\..\scripts\rimworld-deploy-guard.sh&quot; validate &quot;$(RIMWORLD_MOD_DIR)&quot; &quot;$(MSBuildProjectFullPath)&quot; &quot;$(ModFileName)&quot; &quot;$(BuildBridgeTools)&quot;" />
 	</Target>
 
-	<Target Name="BuildBridgeTools" DependsOnTargets="RestoreBridgeTools" AfterTargets="PostBuildAction" BeforeTargets="CopyToRimworld" Condition="'$(BuildBridgeTools)' != 'false'">
-		<MSBuild
-			Projects="$(MSBuildProjectDirectory)\BridgeTools\Clouds.BridgeTools.csproj"
-			Targets="Build"
-			Properties="Configuration=$(Configuration);Platform=$(Platform);CloudsAssemblyPath=$(TargetPath)" />
+	<Target Name="CopyToRimworld" AfterTargets="StageMod" Condition="'$(RIMWORLD_MOD_DIR)' != '' And '$(RimworldDeployGuardInner)' != 'true'">
+		<Exec Command="&quot;$(MSBuildProjectDirectory)\..\scripts\rimworld-deploy-guard.sh&quot; deploy &quot;$(RIMWORLD_MOD_DIR)&quot; &quot;$(MSBuildProjectFullPath)&quot; &quot;$(Configuration)&quot; &quot;$(Platform)&quot; &quot;$(ModFileName)&quot; &quot;$(BuildBridgeTools)&quot;" />
 	</Target>
 
-	<Target Name="CopyToRimworld" AfterTargets="PostBuildAction" Condition="'$(RIMWORLD_MOD_DIR)' != ''">
-		<RemoveDir Directories="$(RIMWORLD_MOD_DIR)\$(ModFileName)" />
-		<PropertyGroup>
-			<GlobalBridgeToolsDir>$(RIMWORLD_MOD_DIR)\..\BridgeTools</GlobalBridgeToolsDir>
-		</PropertyGroup>
-		<RemoveDir Directories="$(GlobalBridgeToolsDir)\Clouds" />
-		<ItemGroup>
-			<Copy_15 Include="..\1.5\**" />
-			<Copy_16 Include="..\1.6\**" />
-			<CopyAbout Include="..\About\**" />
-			<CopyAssemblies Include="..\Assemblies\**" />
-			<CopyResources Include="..\Resources\**" />
-			<CopyLicense Include="..\LICENSE" />
-			<CopyReadme Include="..\README.md" />
-			<CopyBridgeTools Include="..\artifacts\BridgeTools\Clouds\Clouds.BridgeTools.dll" Condition="'$(BuildBridgeTools)' != 'false'" />
-		</ItemGroup>
-		<Copy SourceFiles="@(Copy_15)" DestinationFolder="$(RIMWORLD_MOD_DIR)\$(ModFileName)\1.5\%(RecursiveDir)" />
-		<Copy SourceFiles="@(Copy_16)" DestinationFolder="$(RIMWORLD_MOD_DIR)\$(ModFileName)\1.6\%(RecursiveDir)" />
-		<Copy SourceFiles="@(CopyAbout)" DestinationFolder="$(RIMWORLD_MOD_DIR)\$(ModFileName)\About\%(RecursiveDir)" />
-		<Copy SourceFiles="@(CopyResources)" DestinationFolder="$(RIMWORLD_MOD_DIR)\$(ModFileName)\Resources\%(RecursiveDir)" />
-		<Copy SourceFiles="@(CopyLicense)" DestinationFolder="$(RIMWORLD_MOD_DIR)\$(ModFileName)" />
-		<Copy SourceFiles="@(CopyReadme)" DestinationFolder="$(RIMWORLD_MOD_DIR)\$(ModFileName)" />
-		<Copy SourceFiles="@(CopyBridgeTools)" DestinationFolder="$(GlobalBridgeToolsDir)\Clouds" SkipUnchangedFiles="true" Condition="'@(CopyBridgeTools)' != ''" />
+	<Target Name="_CopyToRimworldUnlocked" Condition="'$(RIMWORLD_MOD_DIR)' != '' And '$(RimworldDeployGuardInner)' == 'true'">
+		<Exec Command="python3 &quot;$(MSBuildProjectDirectory)\..\scripts\stage-mod.py&quot; --install-unlocked &quot;$(RIMWORLD_MOD_DIR)&quot; &quot;$(BuildBridgeTools)&quot;" />
 	</Target>
 
-	<Target Name="ZipMod" AfterTargets="CopyToRimworld" Condition="'$(RIMWORLD_MOD_DIR)' != ''">
-		<ZipDirectory SourceDirectory="$(RIMWORLD_MOD_DIR)\$(ModFileName)" DestinationFile="$(RIMWORLD_MOD_DIR)\$(ModFileName).zip" Overwrite="true" />
-	</Target>
+	<Target Name="ZipMod" DependsOnTargets="StageMod;CopyToRimworld" />
 
 </Project>
